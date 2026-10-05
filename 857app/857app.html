@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>857app v0.107 — FT-857D Master Command App</title>
+<title>857app v0.109 — FT-857D Master Command App</title>
 <style>
 :root{
   --bg:#08090b;
@@ -197,13 +197,33 @@ button:active{background:#1a1c20}
 .ft8-log .ft8-row.to-me.selected{outline:1px solid #ff8a80;background:rgba(211,93,85,0.35)}
 .ft8-log .ft8-row.cq.to-me{background:rgba(211,93,85,0.28)}
 
+
+.ft8-qso-row{display:flex;align-items:flex-start;gap:8px;flex-wrap:wrap;margin:4px 0;padding:6px;background:#0d0f12;border:1px solid #1f2329;border-radius:3px}
+.ft8-qso-msgs{display:flex;flex-direction:column;gap:2px;flex:1;min-width:180px}
+.ft8-qso-line{display:flex;align-items:center;gap:6px;font:11px "Courier New",monospace}
+.ft8-qso-line input[type=radio]{accent-color:var(--amber);margin:0}
+.ft8-qso-line .ft8-qso-txt{flex:1;color:#c8ccd0;padding:1px 4px;border-radius:2px;border:1px solid transparent}
+.ft8-qso-line.selected .ft8-qso-txt{background:rgba(240,165,26,0.15);border-color:#5a4a20;color:#ffd477}
+.ft8-qso-btns{display:flex;flex-direction:column;gap:4px}
+.ft8-qso-btns button{font-size:10px;padding:3px 8px;white-space:nowrap}
+.ft8-qso-meta{font-size:10px;color:#888;font-family:monospace;margin-top:2px}
+#ft8DxCall{width:7em;text-transform:uppercase;font-size:11px}
+
+
+.ft8-log .ft8-row.tx{background:rgba(80,140,220,0.18);border-left:3px solid #5a9fd4;padding-left:6px}
+.ft8-log .ft8-row.tx .ft8-msg{color:#9ec9f0;font-weight:700}
+.ft8-log .ft8-row.tx .ft8-db{color:#5a9fd4}
+.ft8-log .ft8-row.tx.cq{background:rgba(80,140,220,0.28);border-left:3px solid #6eb6f0}
+.ft8-log .ft8-row.tx.cq .ft8-msg{color:#b8dcff;font-weight:700}
+.ft8-log .ft8-row.tx.selected{outline:1px solid #6eb6f0;background:rgba(80,140,220,0.35)}
+
 </style>
 </head>
 <body>
 <div class="app">
   <div class="top">
     <div class="logo">857app</div>
-    <span class="ver">FT-857D CAT v0.107 Master</span>
+    <span class="ver">FT-857D CAT v0.109 Master</span>
     <span style="font-size:10px;color:#aaa">LINK:</span>
     <select id="radioLink" style="font-size:10px;width:140px" title="Web Serial talks to the radio directly; FLRig routes through rw-flrig-bridge.js so FLRig can share the port with WSJT-X etc.">
       <option value="serial">Web Serial (Direct)</option>
@@ -458,6 +478,28 @@ button:active{background:#1a1c20}
       <button id="ft8TuneBtn" class="btn-toggle" style="font-size:10px;padding:4px 8px;font-weight:700;color:#ffd477;border-color:#79540c" title="WSJT-X style TUNE: continuous tone at TX Hz + PTT until clicked again">TUNE</button>
 
     </div>
+
+    <div class="ft8-qso-row" id="ft8QsoRow" title="WSJT-X style standard messages. Generate fills Tx1–Tx6 from CALL/GRID/DX. Auto Seq advances after a matching RX.">
+      <div>
+        <label style="font-size:10px;color:#aaa">DX</label>
+        <input id="ft8DxCall" type="text" maxlength="12" placeholder="DX CALL" spellcheck="false" title="Other station callsign">
+      </div>
+      <div class="ft8-qso-msgs" id="ft8QsoMsgs">
+        <div class="ft8-qso-line" data-tx="1"><input type="radio" name="ft8TxN" value="1" id="ft8TxN1"><label for="ft8TxN1" class="ft8-qso-txt" id="ft8Std1">Tx1 —</label></div>
+        <div class="ft8-qso-line" data-tx="2"><input type="radio" name="ft8TxN" value="2" id="ft8TxN2"><label for="ft8TxN2" class="ft8-qso-txt" id="ft8Std2">Tx2 —</label></div>
+        <div class="ft8-qso-line" data-tx="3"><input type="radio" name="ft8TxN" value="3" id="ft8TxN3"><label for="ft8TxN3" class="ft8-qso-txt" id="ft8Std3">Tx3 —</label></div>
+        <div class="ft8-qso-line" data-tx="4"><input type="radio" name="ft8TxN" value="4" id="ft8TxN4"><label for="ft8TxN4" class="ft8-qso-txt" id="ft8Std4">Tx4 —</label></div>
+        <div class="ft8-qso-line" data-tx="5"><input type="radio" name="ft8TxN" value="5" id="ft8TxN5"><label for="ft8TxN5" class="ft8-qso-txt" id="ft8Std5">Tx5 —</label></div>
+        <div class="ft8-qso-line" data-tx="6"><input type="radio" name="ft8TxN" value="6" id="ft8TxN6"><label for="ft8TxN6" class="ft8-qso-txt" id="ft8Std6">Tx6 —</label></div>
+      </div>
+      <div class="ft8-qso-btns">
+        <button type="button" id="ft8GenStdBtn" title="Generate standard messages (WSJT-X)">Gen Std Msgs</button>
+        <button type="button" id="ft8NextBtn" title="Select next Tx message">Next</button>
+        <button type="button" id="ft8AutoSeqBtn" class="btn-toggle" title="After a matching decode, advance Tx stage automatically">Auto Seq</button>
+      </div>
+    </div>
+    <div class="ft8-qso-meta" id="ft8QsoMeta">QSO: idle — Gen Std Msgs after setting CALL/GRID (and DX if answering CQ)</div>
+
     <div class="ft8-io-wrap">
       <div class="ft8-rx-meter" title="RX audio level (WSJT-X style). Aim upper green / low yellow — avoid red.">
         <span class="lbl">RX</span>
@@ -3845,10 +3887,12 @@ function ft8EnsureLogDelegation(){
     const df=row.dataset.df!=null?parseInt(row.dataset.df,10):NaN;
     if(Number.isFinite(df)) ft8TuneToAudioHz(df, msg||"CQ");
     const their=ft8ExtractCallFromCq(msg);
-    const myCall=($("ft8Call").value||"").trim().toUpperCase();
-    const myGrid=($("ft8Grid").value||"").trim().toUpperCase();
-    if(their&&myCall) $("ft8TxMsg").value=their+" "+myCall+(myGrid?" "+myGrid:"");
-    else if(!myCall) ft8SetStatus("Enter your CALL before arming TX from a CQ");
+    if(!ft8MyCall()){ ft8SetStatus("Enter your CALL before arming TX from a CQ"); return; }
+    if(their){
+      const gridMatch=(msg||"").toUpperCase().match(/\b([A-R]{2}[0-9]{2}[A-X]{0,2})\b/);
+      const snr=row.dataset.db!=null?parseFloat(row.dataset.db):NaN;
+      ft8SetupAnswerCq(their, gridMatch?gridMatch[1]:"", snr);
+    }
     await ft8ArmTx(true);
   });
 }
@@ -3863,7 +3907,7 @@ function ft8RenderLog() {
   let shownSlots = 0;
   ft8History.forEach((slot) => {
     const lines = ft8CqOnly
-      ? slot.lines.filter((item) => ft8IsCq(item.text))
+      ? slot.lines.filter((item) => item.tx || ft8IsCq(item.text))
       : slot.lines;
     if (!lines.length) return;
     shownSlots++;
@@ -3877,28 +3921,46 @@ function ft8RenderLog() {
       const row = document.createElement("div");
       const dfNum = (typeof item.df === "number" && !isNaN(item.df)) ? Math.round(item.df) : null;
       const isSel = dfNum !== null && ft8SelectedHz !== null && Math.abs(dfNum - ft8SelectedHz) <= 1;
-      row.className = "ft8-row" + (ft8IsCq(item.text) ? " cq" : "") + (ft8MessageToMe(item.text) ? " to-me" : "") + (isSel ? " selected" : "");
+      row.className = "ft8-row" + (item.tx ? " tx" : "") + (ft8IsCq(item.text) ? " cq" : "") + (!item.tx && ft8MessageToMe(item.text) ? " to-me" : "") + (isSel ? " selected" : "");
       row.title = dfNum !== null
         ? (ft8IsCq(item.text)
-            ? ("Click: TX " + dfNum + " Hz · Double-click CQ/DX: tune + arm TX · red = to my call")
+            ? ("Click: TX " + dfNum + " Hz · Double-click CQ/DX: tune + arm TX · red = to me · blue = my TX")
             : ("Click to set TX audio to " + dfNum + " Hz"))
         : "Click to tune TX audio";
       if (dfNum !== null) row.dataset.df = String(dfNum);
       if (item.text) row.dataset.msg = item.text;
       if (ft8IsCq(item.text)) row.dataset.cq = "1";
-      const db = (typeof item.db === "number" && !isNaN(item.db)) ? item.db.toFixed(0) : "?";
-      const dt = (typeof item.dt === "number" && !isNaN(item.dt)) ? item.dt.toFixed(1) : "?";
+      if (typeof item.db === "number") row.dataset.db = String(item.db);
+      const db = item.tx ? "TX" : ((typeof item.db === "number" && !isNaN(item.db)) ? item.db.toFixed(0) : "?");
+      const dt = item.tx ? "→" : ((typeof item.dt === "number" && !isNaN(item.dt)) ? item.dt.toFixed(1) : "?");
       const df = dfNum !== null ? String(dfNum) : "?";
       row.innerHTML =
-        '<span class="ft8-db">' + db.padStart(3) + ' dB</span> ' +
-        '<span class="ft8-dt">' + dt.padStart(4) + 's</span> ' +
+        '<span class="ft8-db">' + String(db).padStart(3) + (item.tx ? "" : " dB") + '</span> ' +
+        '<span class="ft8-dt">' + String(dt).padStart(4) + (item.tx ? "" : "s") + '</span> ' +
         '<span class="ft8-df">' + df.padStart(4) + ' Hz</span>  ' +
-        '<span class="ft8-msg">' + (item.text || "") + '</span>';
+        '<span class="ft8-msg">' + (item.tx ? "TX " : "") + (item.text || "") + '</span>';
       log.appendChild(row);
     });
   });
   if (wasBottom) log.scrollTop = log.scrollHeight;
   return { shownMsgs, shownSlots };
+}
+
+
+/** Log our own transmission in the activity window (WSJT-X style). */
+function ft8LogOwnTx(msg, hz) {
+  msg = (msg || "").trim().toUpperCase();
+  if (!msg) return;
+  const now = new Date();
+  const slotLabel = now.toISOString().slice(11, 19) + " UTC TX " + (typeof ft8Mode !== "undefined" ? ft8Mode : "FT");
+  const line = {
+    db: null,
+    dt: null,
+    df: (hz != null && Number.isFinite(Number(hz))) ? Math.round(Number(hz)) : (ft8SelectedHz || null),
+    text: msg,
+    tx: true
+  };
+  ft8AppendLog([line], slotLabel);
 }
 
 function ft8AppendLog(lines, slotLabel) {
@@ -4021,6 +4083,7 @@ async function ft8RunDecodeForSlot() {
     if (!ft8Running) return;
     if (results.length) {
       ft8AppendLog(results, slotLabel);
+      try { ft8AutoSeqOnDecodes(results); } catch (_) {}
       ft8SetStatus(ft8Mode + " " + slotLabel + " — " + results.length + " message(s)");
     } else {
       ft8SetStatus(ft8Mode + " " + slotLabel + " — no decodes");
@@ -4072,6 +4135,234 @@ function ft8UpdateUiClock() {
 }
 
 
+
+/* ---- WSJT-X style standard QSO messages & Auto Seq ---- */
+let ft8DxCall = "";
+let ft8DxGrid = "";
+let ft8HisSnr = -10;      // report we send them (Tx3)
+let ft8TheirSnr = null;   // report they sent us
+let ft8TxNum = 1;         // 1..6 selected Tx
+let ft8AutoSeq = false;
+let ft8QsoRole = "cq";    // "cq" = we called CQ; "answer" = we answered their CQ
+
+function ft8MyCall() {
+  return (($("ft8Call") && $("ft8Call").value) || "").trim().toUpperCase();
+}
+function ft8MyGrid() {
+  return (($("ft8Grid") && $("ft8Grid").value) || "").trim().toUpperCase();
+}
+function ft8GetDx() {
+  const el = $("ft8DxCall");
+  const v = ((el && el.value) || ft8DxCall || "").trim().toUpperCase();
+  ft8DxCall = v;
+  return v;
+}
+function ft8SetDx(call, grid) {
+  ft8DxCall = (call || "").trim().toUpperCase();
+  if (grid) ft8DxGrid = String(grid).trim().toUpperCase();
+  if ($("ft8DxCall")) $("ft8DxCall").value = ft8DxCall;
+}
+
+/** Format SNR as FT report: -10, +05, R-10, etc. */
+function ft8FmtReport(snr, withR) {
+  let n = Math.round(Number(snr));
+  if (!Number.isFinite(n)) n = -10;
+  n = Math.max(-30, Math.min(30, n));
+  const body = (n >= 0 ? "+" : "") + String(n);
+  return withR ? ("R" + body) : body;
+}
+
+/**
+ * Build WSJT-X style Tx1–Tx6.
+ * Tx1 CQ MyCall Grid | Tx2 Dx MyCall Grid | Tx3 Dx MyCall Report
+ * Tx4 Dx MyCall RReport | Tx5 Dx MyCall RR73 | Tx6 Dx MyCall 73
+ */
+function ft8BuildStdMessages() {
+  const me = ft8MyCall();
+  const grid = ft8MyGrid();
+  const dx = ft8GetDx();
+  const rep = ft8FmtReport(ft8HisSnr, false);
+  const rrep = ft8FmtReport(ft8TheirSnr != null ? ft8TheirSnr : ft8HisSnr, true);
+  return {
+    1: me ? ("CQ " + me + (grid ? " " + grid : "")) : "",
+    2: (dx && me) ? (dx + " " + me + (grid ? " " + grid : "")) : "",
+    3: (dx && me) ? (dx + " " + me + " " + rep) : "",
+    4: (dx && me) ? (dx + " " + me + " " + rrep) : "",
+    5: (dx && me) ? (dx + " " + me + " RR73") : "",
+    6: (dx && me) ? (dx + " " + me + " 73") : ""
+  };
+}
+
+function ft8ApplyStdToMsg(n) {
+  const msgs = ft8BuildStdMessages();
+  const m = msgs[n] || "";
+  if ($("ft8TxMsg")) $("ft8TxMsg").value = m;
+  ft8TxNum = n;
+  // highlight selected radio + line
+  const rad = $("ft8TxN" + n);
+  if (rad) rad.checked = true;
+  document.querySelectorAll(".ft8-qso-line").forEach((el) => {
+    el.classList.toggle("selected", String(el.dataset.tx) === String(n));
+  });
+  for (let i = 1; i <= 6; i++) {
+    const lab = $("ft8Std" + i);
+    if (lab) lab.textContent = "Tx" + i + "  " + (msgs[i] || "—");
+  }
+  if ($("ft8QsoMeta")) {
+    $("ft8QsoMeta").textContent =
+      "QSO: Tx" + n + (ft8AutoSeq ? " · Auto Seq ON" : "") +
+      (ft8DxCall ? (" · DX " + ft8DxCall) : "") +
+      (ft8QsoRole === "answer" ? " · answering CQ" : " · CQ role") +
+      (m ? (" · “" + m + "”") : "");
+  }
+  try { ft8SaveTxSettings(); } catch (_) {}
+  return m;
+}
+
+function ft8GenerateStdMsgs() {
+  const msgs = ft8BuildStdMessages();
+  for (let i = 1; i <= 6; i++) {
+    const lab = $("ft8Std" + i);
+    if (lab) lab.textContent = "Tx" + i + "  " + (msgs[i] || "—");
+  }
+  // Keep current Tx selection if possible
+  if (!msgs[ft8TxNum]) ft8TxNum = msgs[1] ? 1 : 2;
+  ft8ApplyStdToMsg(ft8TxNum);
+  ft8SetStatus("Standard messages generated (WSJT-X Tx1–Tx6)");
+}
+
+function ft8NextTx() {
+  let n = ft8TxNum + 1;
+  if (n > 6) n = 1;
+  ft8ApplyStdToMsg(n);
+}
+
+/** Parse inbound FT message for Auto Seq / DX extract. */
+function ft8ParseInbound(text) {
+  const msg = (text || "").trim().toUpperCase().replace(/\s+/g, " ");
+  if (!msg) return null;
+  const me = ft8MyCall();
+  const parts = msg.split(" ");
+  // CQ [DX] CALL [GRID]
+  if (parts[0] === "CQ") {
+    let i = 1;
+    if (parts[1] && /^[A-Z]{1,4}$/.test(parts[1]) && parts[2] && /[0-9]/.test(parts[2])) i = 2; // CQ DX CALL
+    const call = parts[i] || "";
+    const grid = parts[i + 1] && /^[A-R]{2}[0-9]{2}/.test(parts[i + 1]) ? parts[i + 1] : "";
+    return { type: "cq", call, grid, msg };
+  }
+  // CALL CALL REPORT / R-REPORT / RR73 / RRR / 73 / GRID
+  if (parts.length >= 2) {
+    const a = parts[0], b = parts[1], c = parts[2] || "";
+    const isRep = /^[+-]?\d{1,2}$/.test(c) || /^\+\d{2}$/.test(c);
+    const isRRep = /^R[+-]?\d{1,2}$/.test(c) || /^R\+\d{2}$/.test(c);
+    if (c === "RR73" || c === "RRR") return { type: "rr73", a, b, msg };
+    if (c === "73") return { type: "73", a, b, msg };
+    if (isRRep) {
+      const snr = parseInt(c.replace(/^R/, ""), 10);
+      return { type: "rreport", a, b, snr, msg };
+    }
+    if (isRep) {
+      const snr = parseInt(c, 10);
+      return { type: "report", a, b, snr, msg };
+    }
+    if (/^[A-R]{2}[0-9]{2}/.test(c) || !c) {
+      return { type: "reply", a, b, grid: c, msg };
+    }
+  }
+  return { type: "other", msg };
+}
+
+/**
+ * After a decode slot, if Auto Seq is on, advance Tx based on last messages
+ * directed to us (WSJT-X-like).
+ */
+function ft8AutoSeqOnDecodes(lines) {
+  if (!ft8AutoSeq || !lines || !lines.length) return;
+  const me = ft8MyCall();
+  if (!me) return;
+  // Prefer messages that address us
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const text = lines[i].text || lines[i].msg || "";
+    if (!ft8MessageToMe(text) && !ft8IsCq(text)) continue;
+    const p = ft8ParseInbound(text);
+    if (!p) continue;
+
+    if (p.type === "cq" && p.call && p.call !== me) {
+      // Someone else CQ — only useful if user double-clicks; skip auto
+      continue;
+    }
+    // Directed to me: A is me, B is DX  OR  A is DX, B is me
+    let dx = "";
+    if (p.a === me) dx = p.b;
+    else if (p.b === me) dx = p.a;
+    else if (p.type === "cq") continue;
+    else continue;
+
+    if (dx) ft8SetDx(dx, p.grid || ft8DxGrid);
+
+    if (p.type === "reply") {
+      // They answered our CQ with grid → we send report (Tx3)
+      if (ft8TxNum <= 2) {
+        ft8QsoRole = "cq";
+        if (typeof lines[i].db === "number") ft8HisSnr = Math.round(lines[i].db);
+        ft8ApplyStdToMsg(3);
+        ft8SetStatus("Auto Seq → Tx3 report to " + dx);
+        return;
+      }
+    }
+    if (p.type === "report") {
+      // They sent us a report → we send R+report (Tx4)
+      ft8TheirSnr = p.snr;
+      if (typeof lines[i].db === "number") ft8HisSnr = Math.round(lines[i].db);
+      ft8ApplyStdToMsg(4);
+      ft8SetStatus("Auto Seq → Tx4 R-report to " + dx);
+      return;
+    }
+    if (p.type === "rreport") {
+      ft8TheirSnr = p.snr;
+      ft8ApplyStdToMsg(5);
+      ft8SetStatus("Auto Seq → Tx5 RR73 to " + dx);
+      return;
+    }
+    if (p.type === "rr73") {
+      ft8ApplyStdToMsg(6);
+      ft8SetStatus("Auto Seq → Tx6 73 to " + dx);
+      return;
+    }
+    if (p.type === "73") {
+      // QSO complete — stop auto arm optional
+      ft8SetStatus("Auto Seq: 73 received from " + dx + " — QSO complete");
+      if (ft8TxArmed) {
+        ft8TxArmed = false;
+        ft8TxOnce = false;
+        try { ft8SyncArmUi(); } catch (_) {}
+      }
+      return;
+    }
+  }
+}
+
+/** Prepare QSO when double-clicking a CQ (we answer). */
+function ft8SetupAnswerCq(theirCall, theirGrid, snr) {
+  ft8QsoRole = "answer";
+  ft8SetDx(theirCall, theirGrid);
+  if (typeof snr === "number" && Number.isFinite(snr)) ft8HisSnr = Math.round(snr);
+  ft8GenerateStdMsgs();
+  ft8ApplyStdToMsg(2); // first TX is reply with grid
+  ft8AutoSeq = true;
+  const btn = $("ft8AutoSeqBtn");
+  if (btn) btn.classList.add("active");
+  // Opposite slot of current is handled by user; leave slot as-is
+}
+
+/** Prepare when we want to call CQ. */
+function ft8SetupCallCq() {
+  ft8QsoRole = "cq";
+  ft8GenerateStdMsgs();
+  ft8ApplyStdToMsg(1);
+}
+
 function ft8BuildCqMessage() {
   const call = ($("ft8Call").value || "").trim().toUpperCase();
   const grid = ($("ft8Grid").value || "").trim().toUpperCase();
@@ -4082,6 +4373,8 @@ function ft8BuildCqMessage() {
 function ft8GetTxMessage() {
   const free = ($("ft8TxMsg").value || "").trim().toUpperCase();
   if (free) return free;
+  const std = ft8BuildStdMessages();
+  if (std[ft8TxNum]) return std[ft8TxNum];
   return ft8BuildCqMessage();
 }
 
@@ -4322,6 +4615,7 @@ async function ft8TransmitSlot() {
     ft8MuteRxForTx(true);
     const pttOk = await ft8SetPtt(true);
     src.start();
+    try { ft8LogOwnTx(msg, hz); } catch (_) {}
     ft8SetStatus((pttOk ? "TX ON (PTT) — " : "TX audio only (no PTT) — ") + msg + " @ " + hz + " Hz");
 
     const durMs = (samples.length / FT8_TARGET_SR) * 1000 + 50;
@@ -4459,6 +4753,28 @@ $("ft8GenCqBtn").onclick = () => {
   $("ft8TxMsg").value = m;
   ft8SetStatus("MSG set to “" + m + "”");
 };
+
+if ($("ft8GenStdBtn")) $("ft8GenStdBtn").onclick = () => ft8GenerateStdMsgs();
+if ($("ft8NextBtn")) $("ft8NextBtn").onclick = () => ft8NextTx();
+if ($("ft8AutoSeqBtn")) $("ft8AutoSeqBtn").onclick = () => {
+  ft8AutoSeq = !ft8AutoSeq;
+  $("ft8AutoSeqBtn").classList.toggle("active", ft8AutoSeq);
+  ft8ApplyStdToMsg(ft8TxNum);
+  ft8SetStatus(ft8AutoSeq ? "Auto Seq ON" : "Auto Seq OFF");
+};
+for (let i = 1; i <= 6; i++) {
+  const r = $("ft8TxN" + i);
+  if (r) r.onchange = () => { if (r.checked) ft8ApplyStdToMsg(i); };
+}
+if ($("ft8DxCall")) {
+  $("ft8DxCall").addEventListener("change", () => { ft8DxCall = $("ft8DxCall").value.trim().toUpperCase(); ft8GenerateStdMsgs(); });
+  $("ft8DxCall").addEventListener("blur", () => { ft8DxCall = $("ft8DxCall").value.trim().toUpperCase(); ft8GenerateStdMsgs(); });
+}
+if ($("ft8GenCqBtn")) {
+  const _g = $("ft8GenCqBtn").onclick;
+  $("ft8GenCqBtn").onclick = () => { ft8SetupCallCq(); };
+}
+
 $("ft8TxEnableBtn").onclick = async () => {
   if (ft8TxArmed || ft8TxOnce) {
     ft8TxArmed = false;

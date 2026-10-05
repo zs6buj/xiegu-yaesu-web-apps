@@ -1,8 +1,10 @@
 # 857app
 
-**Yaesu FT-857D** browser CAT controller with SDR-style baseband waterfall and built-in **FT8 / FT4** RX/TX helpers.
+**Yaesu FT-857D** browser CAT controller with SDR-style baseband waterfall and built-in **FT8 / FT4** RX/TX and WSJT-X-style QSO sequencing.
 
 Open [`857app.html`](./857app.html) in Chrome or Edge.
+
+**Version:** v0.109
 
 ---
 
@@ -10,84 +12,92 @@ Open [`857app.html`](./857app.html) in Chrome or Edge.
 
 ### Radio control (Web Serial CAT)
 - Frequency, mode, VFO A/B, split, clarifier, lock
-- Band buttons with standard FT8/FT4 dial frequencies when FT mode is active
-- RPT shift / tone / CTCSS–DCS (including EEPROM-backed offset where mapped)
-- NB, IPO, ATT, NAR, AGC, DNR/DNF (where supported via CAT/EEPROM)
+- Band buttons; auto QSY to FT8/FT4 dial frequencies when FT mode is active
+- RPT shift / tone / CTCSS–DCS (EEPROM-backed offset where mapped)
+- NB, IPO, ATT, NAR, AGC, DNR/DNF (CAT/EEPROM as supported)
 - TX power (EEPROM band registers; disabled under FLRig)
-- S-meter (CAT `0xE7`); TX meter mode PWR/ALC/MOD/SWR via EEPROM when on Web Serial
+- S-meter (CAT `0xE7`); TX meter mode PWR/ALC/MOD/SWR via EEPROM on Web Serial
 - EEPROM peek (16-bit address)
 
 ### Link modes
-- **Web Serial** — full feature set (direct to radio)
+- **Web Serial** — full feature set
 - **FLRig XML-RPC** — via local bridge (freq/mode/S-meter/PTT subset; EEPROM-only controls greyed out)
 
 ### Spectrum / waterfall
-- Web Audio baseband FFT (mic/line/USB codec)
-- Gain, floor, ceil, FFT size, palette, span, OFS +1k display shift
-- Click spectrum/waterfall to set FT TX audio Hz
+- Web Audio baseband FFT (USB codec / line / mic)
+- Gain, floor, ceil, FFT size, palette, span, OFS +1k
+- Click spectrum/waterfall → FT TX audio Hz
 - Vertical TX channel markers (FT8 ~50 Hz / FT4 ~90 Hz)
 - USB dropout concealment; slower CAT poll while audio is running
 
 ### FT8 / FT4
-- RX decode from the same audio stream (WASM: ft8js / @e04/ft8ts)
-- Decode in a **Web Worker** to reduce audio glitches
-- CQ filter; **red highlight** for messages containing **your call**
-- Click row → TX Hz; double-click CQ → tune + arm TX + draft reply
+- RX decode from the same audio stream (WASM; decode in a **Web Worker**)
+- CQ filter; **red** = messages to **your call**; **blue** = **your own TX** (including your CQ)
+- Click decode → TX Hz; double-click CQ → DX + Tx2 + Auto Seq + arm TX
+- **WSJT-X-style standard messages** (Tx1–Tx6), **Gen Std Msgs**, **Next**, **Auto Seq**
 - ARM TX / TX 1 SLOT / **TUNE** (continuous tone + PTT)
-- TX drive slider; RX level meter (WSJT-X style)
-- Auto QSY to band FT dial + **DIG** mode when starting FT
-- Auto-start audio when decoding starts; FT8↔FT4 switch starts decode
+- TX drive slider; RX level meter
+- Auto QSY + **DIG** mode when starting FT
 
 ---
 
 ## Operating guide
 
-### 1. Connect the radio
-1. USB–serial cable (or radio USB if it presents a serial port).
-2. Choose **Web Serial (Direct)** or **FLRig (XML-RPC)**.
-3. Click **Connect** and pick the port (Serial) or confirm bridge host/port (default `127.0.0.1:4534`).
+### 1. Connect
+1. USB–serial (or radio USB serial).
+2. **Web Serial (Direct)** or **FLRig (XML-RPC)**.
+3. **Connect** → choose port, or set bridge host/port (default `127.0.0.1:4534`).
 
-### 2. Basic operation
-- Tune with band buttons, frequency digits (scroll), or FLRig/other software when bridged.
-- Mode buttons set SSB/CW/FM/DIG etc.
-- Watch the **S-meter** on Web Serial or FLRig (`rig.get_smeter` when available).
+### 2. Everyday radio use
+- Band buttons, frequency digits, mode grid.
+- S-meter on Serial or FLRig (`rig.get_smeter` when available).
+- FLRig: TX meter mode, power slider, and EEPROM tools stay disabled (no EEPROM over XML-RPC).
 
-### 3. Waterfall audio
-1. Click **START AUDIO** and allow microphone/line access.
-2. Select the radio **USB audio** device if listed (not the PC mic).
-3. Adjust **GAIN / FLOOR / CEIL** so signals show clearly without constant red.
-4. For FT work, span **0–2.5 kHz** (or similar) is usually enough.
+### 3. Waterfall
+1. **START AUDIO** → allow access → select radio **USB audio** device.
+2. Adjust **GAIN / FLOOR / CEIL**.
+3. Prefer span ~0–2.5 kHz for FT work.
 
-### 4. FT8 / FT4 RX
+### 4. FT8 / FT4 receive
 1. Enter **CALL** and optional **GRID**.
-2. Select **FT8** or **FT4** (starts decode and QSYs to the standard dial when possible).
-3. Or press **START FT8/FT4** after audio is running.
-4. Keep the PC clock **NTP-synced** (slots are UTC).
-5. **CQ ONLY** filters the log; your call appears in **red**.
+2. Select **FT8** or **FT4** (starts decode and QSYs when possible).
+3. Keep the PC clock **NTP-synced**.
+4. **CQ ONLY** filters the log. Colour key: amber = others’ CQ, red = to you, blue = your TX.
 
-### 5. FT TX
-1. Set **Hz** (click a decode or the waterfall).
-2. Set **MSG** or leave blank for auto `CQ CALL GRID`.
-3. Choose **TX even** or **TX odd** slots.
-4. **ARM TX** for continuous slot TX, or **TX 1 SLOT** once.
-5. **TUNE** = continuous tone at TX Hz + PTT (click again to stop).
-6. Route **browser audio output** to the radio **DATA/USB** input; set radio to **DIG**; use **TX drive** and radio mic gain so ALC is modest.
+### 5. Standard QSO (like WSJT-X)
 
-### 6. FLRig notes
-- Use a local CORS bridge; the browser cannot call FLRig directly.
-- Expect freq/mode/meter/PTT — not EEPROM features (power slider, tone tables, etc.).
+| Tx | Meaning | Example |
+|----|---------|---------|
+| Tx1 | You call CQ | `CQ ZS6BUJ KG43` |
+| Tx2 | You answer their CQ | `K1ABC ZS6BUJ KG43` |
+| Tx3 | Signal report | `K1ABC ZS6BUJ -10` |
+| Tx4 | Roger + report | `K1ABC ZS6BUJ R-10` |
+| Tx5 | RR73 | `K1ABC ZS6BUJ RR73` |
+| Tx6 | 73 | `K1ABC ZS6BUJ 73` |
+
+1. Set CALL / GRID (and **DX** if known).
+2. **Gen Std Msgs** fills Tx1–Tx6.
+3. Select a Tx line, or use **Next**.
+4. **Auto Seq** advances after a matching decode (report → R-report → RR73 → 73).
+5. **Double-click a CQ** in the log: sets DX, Tx2, Auto Seq on, arms TX.
+6. **CQ…** selects Tx1 (you call CQ).
+
+### 6. FT transmit
+1. MSG is driven by the selected Tx (or free text in MSG).
+2. **ARM TX** or **TX 1 SLOT**; choose even/odd slots.
+3. **TUNE** = continuous tone at TX Hz + PTT.
+4. Browser audio **out** → radio **DATA/USB**; radio in **DIG**; set **TX drive** and radio gain for modest ALC.
 
 ### Troubleshooting
 | Symptom | Try |
 |--------|-----|
-| No connect | Chrome/Edge; correct port; close other CAT programs if not using FLRig |
-| Waterfall silent | Correct USB audio device; START AUDIO; OS privacy settings |
-| Dark bars on waterfall | USB composite CAT+audio — reduce other USB load; already mitigated in recent builds |
-| No FT decodes | Audio level mid-green; UTC clock; full 15 s / 7.5 s of audio |
-| TX not heard | DIG mode; audio path to radio; TX drive; PTT via CAT |
+| No connect | Chrome/Edge; free the serial port (or use FLRig share) |
+| Silent waterfall | Correct USB audio device; START AUDIO |
+| Black bars on waterfall | USB CAT+audio contention — mitigated; try audio-only test |
+| No decodes | Level mid-green on RX meter; NTP clock; full slot of audio |
+| TX not heard | DIG mode; audio path; TX drive; CAT PTT |
 
 ---
 
-## Version
-
-Bundled build: **v0.107** (`857app.html`).
+## Files
+- `857app.html` — single-file app (open locally or via static hosting)
