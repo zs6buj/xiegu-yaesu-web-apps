@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>857app v0.109 — FT-857D Master Command App</title>
+<title>857app v0.110 — FT-857D Master Command App</title>
 <style>
 :root{
   --bg:#08090b;
@@ -223,7 +223,7 @@ button:active{background:#1a1c20}
 <div class="app">
   <div class="top">
     <div class="logo">857app</div>
-    <span class="ver">FT-857D CAT v0.109 Master</span>
+    <span class="ver">FT-857D CAT v0.110 Master</span>
     <span style="font-size:10px;color:#aaa">LINK:</span>
     <select id="radioLink" style="font-size:10px;width:140px" title="Web Serial talks to the radio directly; FLRig routes through rw-flrig-bridge.js so FLRig can share the port with WSJT-X etc.">
       <option value="serial">Web Serial (Direct)</option>
@@ -1048,10 +1048,20 @@ function modeCode(m) {
   }[m] ?? 0x01;
 }
 
+// Frame-sync guards. The FT-857D answers every non-query command (set freq,
+// set mode, ...) with a 1-byte 0x00 ACK. If that stray byte lands in the RX
+// buffer just before a frequency reply, the 5-byte frame is read shifted by one
+// byte ([00 02 83 15 00] instead of [02 83 15 00 01]) and still passes the BCD
+// and mode-code checks — giving e.g. 000.283.150 instead of 028.315.000.
+let lastCmdAt = 0;           // time of the last command sent to the radio
+let userFreqHoldUntil = 0;   // ignore stale polled freqs briefly after an app QSY
+let freqSettleTimer = null;
+
 // Low-level Serial Transmit (Exact v0.6 send pipeline)
 async function send(bytes) {
   if (!writer) return;
   try {
+    lastCmdAt = Date.now();
     awaitingFreq = false;
     awaitingEeprom = false;
     rxBuffer = [];
@@ -1068,6 +1078,7 @@ async function setFreq(hz) {
   const prevBand = state.rptBand;
   const prevOffset = state.rptOffset10Hz;
   state.freq = Math.max(10000, Math.min(560000000, hz));
+  userFreqHoldUntil = Date.now() + 700;
   const newBand = getDisplayBand(state.freq);
   if (newBand) state.rptBand = newBand;
   const bandChanged = !!(newBand && newBand !== prevBand);
@@ -1382,6 +1393,8 @@ let meterTimeout = null;
 async function query() {
   if (radioLink === "flrig") { await flrigPollFreqMode(); return; }
   if (!writer || awaitingFreq || awaitingMeter || awaitingEeprom) return;
+  // Let the radio's 1-byte ACK for a just-sent command arrive first.
+  if (Date.now() - lastCmdAt < 250) return;
   rxBuffer = [];
   awaitingFreq = true;
   lastCat = "TX: 00 00 00 00 03";
@@ -2382,6 +2395,10 @@ function decodeFrequencyResponse(block) {
   const hz = tenHz * 10;
   if (hz < 10000 || hz > 560000000) return false;
 
+  // Right after an app-driven QSY (e.g. scrolling a digit) the radio may still
+  // report the old frequency; don't let that overwrite what the user just set.
+  if (Date.now() < userFreqHoldUntil && hz !== state.freq) return true;
+
   const previousBand = getIpoAttBand(state.freq)?.key || null;
   const previousPowerReg = getPowerReg(state.freq)?.key || null;
   state.freq = hz;
@@ -2441,13 +2458,21 @@ function feedSerial(data) {
   }
 
   if (rxBuffer.length >= 5) {
-    const block = rxBuffer.splice(0, 5);
-    if (decodeFrequencyResponse(block)) {
-      awaitingFreq = false;
-      if (queryTimeout) clearTimeout(queryTimeout);
-    } else {
-      rxBuffer = [];
-    }
+    // Wait a moment for the frame to finish, then take the LAST 5 bytes: any
+    // stray ACK byte(s) always arrive before the real reply, never after it.
+    if (freqSettleTimer) clearTimeout(freqSettleTimer);
+    freqSettleTimer = setTimeout(finishFreqFrame, 20);
+  }
+}
+
+function finishFreqFrame() {
+  freqSettleTimer = null;
+  if (!awaitingFreq || rxBuffer.length < 5) return;
+  const block = rxBuffer.slice(-5);
+  rxBuffer = [];
+  if (decodeFrequencyResponse(block)) {
+    awaitingFreq = false;
+    if (queryTimeout) clearTimeout(queryTimeout);
   }
 }
 

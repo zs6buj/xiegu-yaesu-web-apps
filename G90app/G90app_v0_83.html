@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>G90app v0.82 — Xiegu G90 CAT Master</title>
+<title>G90app v0.83 — Xiegu G90 CAT Master</title>
 <style>
 :root{--bg:#08090b;--panel:#15171a;--panel2:#1d2024;--text:#e7e8ea;--muted:#8b9097;--amber:#f0a51a;--amber-dark:#79540c;--green:#9fbf55;--red:#d35d55;--line:#2b2f34}
 *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font-family:Arial,Helvetica,sans-serif;user-select:none}
@@ -122,7 +122,7 @@ table{width:100%;border-collapse:collapse;font:9px "Courier New",monospace}th,td
 <body>
 <div class="app">
   <div class="top">
-    <div class="logo">G90app</div><span class="ver">Xiegu G90 CI-V CAT v0.82</span>
+    <div class="logo">G90app</div><span class="ver">Xiegu G90 CI-V CAT v0.83</span>
     <select id="transport" title="Connection transport">
       <option value="serial" selected>Web Serial</option>
       <option value="flrig">FLrig XML-RPC</option>
@@ -399,6 +399,10 @@ table{width:100%;border-collapse:collapse;font:9px "Courier New",monospace}th,td
 
 <script>
 let port=null,reader=null,writer=null,rxBuf=[],pollTimer=null,requestBusy=false,ritHoldUntil=0;
+// After the user tunes (wheel / setFreq) the radio may still report the OLD frequency for a
+// moment (poll replies already in flight). Ignore differing polled freqs during this window so
+// the display doesn't snap back while scrolling.
+let userFreqHoldUntil=0;
 let transport="serial"; // "serial" | "flrig"
 let flrigUrl="http://127.0.0.1:4534/RPC2";
 let flrigChain=Promise.resolve(); // serialize all XML-RPC so poll and toggles never overlap
@@ -710,8 +714,11 @@ function handleFrame(f){
     if(p.length>=5){
       let hz=decodeFreq(p.slice(-5));
       if(hz>=500000&&hz<=30000000){
-        state.freq=hz;
-        state[state.vfo==="A"?"a":"b"]=hz;
+        if(Date.now()<userFreqHoldUntil&&hz!==state.freq){log("RX freq "+hz+" ignored (stale, user tuning)")}
+        else{
+          state.freq=hz;
+          state[state.vfo==="A"?"a":"b"]=hz;
+        }
       }
     }
   }
@@ -938,6 +945,7 @@ function render(){
 }
 async function setFreq(hz){
   hz=Math.round(hz);
+  userFreqHoldUntil=Date.now()+900;
   state.freq=hz;state[state.vfo==="A"?"a":"b"]=hz;render();
   if(transport==="flrig"&&flrigUrl){
     requestBusy=true;
@@ -994,6 +1002,7 @@ function onDigitWheel(e){
   lastWheelStep=now;
   let hz=state.freq+dir*place;
   hz=Math.max(500000,Math.min(30000000,hz));
+  userFreqHoldUntil=Date.now()+WHEEL_CAT_MS+900;
   state.freq=hz;
   state[state.vfo==="A"?"a":"b"]=hz;
   renderFreqDigits(hz);

@@ -1,4 +1,4 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>SDR Visualiser v0.52 — Generic CAT / Waterfall</title><style>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>SDR Visualiser v0.53 — Generic CAT / Waterfall</title><style>
 :root{
   --bg:#08090b;
   --panel:#15171a;
@@ -210,7 +210,7 @@ button:active{background:#1a1c20}
 
 </style>
 </style></head><body><div class="app">
-<div class="top"><div class="logo">SDR VISUALISER</div><span class="ver">v0.52</span><span style="font-size:10px;color:#aaa">LINK:</span><select id="radioLink" style="font-size:10px;width:150px"><option value="serial">Web Serial (Direct)</option><option value="flrig">FLRig (XML-RPC)</option></select><span id="serialModeFields"><span style="font-size:10px;color:#aaa">RADIO:</span><select id="radioModel" style="font-size:10px;width:120px"><option>FT-857D</option><option>FT-817/818</option><option>FT-897D</option><option>Generic CAT</option></select><span style="font-size:10px;color:#aaa">CAT:</span><select id="catSet" style="font-size:10px;width:120px"><option>Yaesu CAT</option><option>Generic / Manual</option><option>Icom CI-V</option><option>Kenwood CAT</option><option>Elecraft K3</option></select></span><span id="flrigModeFields" class="bridge-fields" style="display:none"><span class="bridge-label">BRIDGE</span><input id="flrigHost" value="127.0.0.1" title="rw-flrig-bridge.js host"><span style="font-size:11px;color:#ffd477;font-weight:700">:</span><input id="flrigPort" value="4534" title="rw-flrig-bridge.js HTTP port"></span><button id="connect" class="connect">Connect</button></div>
+<div class="top"><div class="logo">SDR VISUALISER</div><span class="ver">v0.53</span><span style="font-size:10px;color:#aaa">LINK:</span><select id="radioLink" style="font-size:10px;width:150px"><option value="serial">Web Serial (Direct)</option><option value="flrig">FLRig (XML-RPC)</option></select><span id="serialModeFields"><span style="font-size:10px;color:#aaa">RADIO:</span><select id="radioModel" style="font-size:10px;width:120px"><option>FT-857D</option><option>FT-817/818</option><option>FT-897D</option><option>Generic CAT</option></select><span style="font-size:10px;color:#aaa">CAT:</span><select id="catSet" style="font-size:10px;width:120px"><option>Yaesu CAT</option><option>Generic / Manual</option><option>Icom CI-V</option><option>Kenwood CAT</option><option>Elecraft K3</option></select></span><span id="flrigModeFields" class="bridge-fields" style="display:none"><span class="bridge-label">BRIDGE</span><input id="flrigHost" value="127.0.0.1" title="rw-flrig-bridge.js host"><span style="font-size:11px;color:#ffd477;font-weight:700">:</span><input id="flrigPort" value="4534" title="rw-flrig-bridge.js HTTP port"></span><button id="connect" class="connect">Connect</button></div>
 <div class="display"><div><div style="font-size:11px;color:#777;margin-bottom:4px">RADIO FREQUENCY</div><div class="subfreq"><span class="badge" id="modeValue">USB</span><span class="badge">CAT</span></div></div><div class="freq-box"><div class="freq" id="freq"></div></div></div>
 <div class="card" style="margin-bottom:6px"><div class="card-head"><h3>S-METER <span class="led" id="sqlLed"></span></h3><span class="tag" title="RX S-meter / squelch: CAT 0xE7 (1 byte)">CAT 0xE7</span></div><div class="smeter-row"><div class="smeter-bar" id="smeterBar"></div><span class="smeter-readout" id="smeterReadout">S0</span></div><div class="smeter-scale"><span>S1</span><span>S3</span><span>S5</span><span>S7</span><span>S9</span><span>+20</span><span>+40</span><span>+60</span></div></div>
 <div class="toolbar">
@@ -481,9 +481,14 @@ $("freq").addEventListener("wheel",e=>{
 function bcdPair(n){return((Math.floor(n/10)<<4)|(n%10));}
 function makeFreq(hz){const s=String(Math.round(hz/10)).padStart(8,"0").slice(-8);return new Uint8Array([bcdPair(+s.slice(0,2)),bcdPair(+s.slice(2,4)),bcdPair(+s.slice(4,6)),bcdPair(+s.slice(6,8)),0x01]);}
 function modeCode(m){return{LSB:0x00,USB:0x01,CW:0x02,CWR:0x03,AM:0x04,WFM:0x06,FM:0x08,"FM-N":0x88,DIG:0x0A,PKT:0x0C}[m]??0x01;}
-async function send(bytes){if(!writer)return;try{rxBuffer=[];await writer.write(bytes);lastCat="TX: "+Array.from(bytes,b=>b.toString(16).padStart(2,"0").toUpperCase()).join(" ");updateDiag();}catch(e){setStatus("Tx Error: "+e.message);}}
+// Frame-sync guards: the radio ACKs every non-query command with a stray 1-byte 0x00.
+// If it lands before a freq reply, the 5-byte frame is read shifted by one byte
+// ([00 02 83 15 00] instead of [02 83 15 00 01]) and still passes BCD/mode checks.
+let lastCmdAt=0, userFreqHoldUntil=0, freqSettleTimer=null;
+async function send(bytes){if(!writer)return;try{lastCmdAt=Date.now();rxBuffer=[];await writer.write(bytes);lastCat="TX: "+Array.from(bytes,b=>b.toString(16).padStart(2,"0").toUpperCase()).join(" ");updateDiag();}catch(e){setStatus("Tx Error: "+e.message);}}
 async function setFreq(hz,opts={}){
   state.freq=Math.max(10000,Math.min(560000000,Math.round(hz)));
+  userFreqHoldUntil=Date.now()+700;
   render();renderWaterfallScale();saveWaterfallSettings();
   if(radioLink==="flrig"){await flrigSetFreq(state.freq);return;}
   await send(makeFreq(state.freq));
@@ -588,9 +593,9 @@ async function setBand(mhz,mode){
   }
 }
 function isBcdByte(x){return((x&15)<=9)&&((x>>4)<=9);} function bcdByte(x){return((x>>4)*10)+(x&15);}
-function decodeFrequencyResponse(block){if(block.length!==5||!block.slice(0,4).every(isBcdByte))return false;const modes={0x00:"LSB",0x01:"USB",0x02:"CW",0x03:"CWR",0x04:"AM",0x06:"WFM",0x08:"FM",0x88:"FM-N",0x0A:"DIG",0x0C:"PKT"};if(!(block[4] in modes))return false;const hz=(bcdByte(block[0])*1000000+bcdByte(block[1])*10000+bcdByte(block[2])*100+bcdByte(block[3]))*10;if(hz<10000||hz>560000000)return false;state.freq=hz;state.mode=modes[block[4]];applyAutomaticBandwidth();render();renderWaterfallScale();lastCat="RX: "+Array.from(block,b=>b.toString(16).padStart(2,"0").toUpperCase()).join(" ");updateDiag();return true;}
+function decodeFrequencyResponse(block){if(block.length!==5||!block.slice(0,4).every(isBcdByte))return false;const modes={0x00:"LSB",0x01:"USB",0x02:"CW",0x03:"CWR",0x04:"AM",0x06:"WFM",0x08:"FM",0x88:"FM-N",0x0A:"DIG",0x0C:"PKT"};if(!(block[4] in modes))return false;const hz=(bcdByte(block[0])*1000000+bcdByte(block[1])*10000+bcdByte(block[2])*100+bcdByte(block[3]))*10;if(hz<10000||hz>560000000)return false;if(Date.now()<userFreqHoldUntil&&hz!==state.freq)return true;state.freq=hz;state.mode=modes[block[4]];applyAutomaticBandwidth();render();renderWaterfallScale();lastCat="RX: "+Array.from(block,b=>b.toString(16).padStart(2,"0").toUpperCase()).join(" ");updateDiag();return true;}
 function decodeMeterResponse(byte){state.squelchOpen=(byte&0x80)===0;state.sMeter=byte&15;renderSMeter();lastCat="RX: "+byte.toString(16).padStart(2,"0").toUpperCase()+" (meter)";updateDiag();}
-async function query(){if(radioLink==="flrig"){return flrigPollFreqMode();}if(!writer||awaitingFreq||awaitingMeter)return;rxBuffer=[];awaitingFreq=true;lastCat="TX: 00 00 00 00 03";updateDiag();clearTimeout(queryTimeout);queryTimeout=setTimeout(()=>{awaitingFreq=false;},400);try{await writer.write(new Uint8Array([0,0,0,0,0x03]));}catch(e){awaitingFreq=false;}}
+async function query(){if(radioLink==="flrig"){return flrigPollFreqMode();}if(!writer||awaitingFreq||awaitingMeter)return;if(Date.now()-lastCmdAt<250)return;rxBuffer=[];awaitingFreq=true;lastCat="TX: 00 00 00 00 03";updateDiag();clearTimeout(queryTimeout);queryTimeout=setTimeout(()=>{awaitingFreq=false;},400);try{await writer.write(new Uint8Array([0,0,0,0,0x03]));}catch(e){awaitingFreq=false;}}
 async function queryMeter(){if(radioLink==="flrig"){return flrigPollMeter();}if(!writer||awaitingFreq||awaitingMeter||!RADIO_MODELS[radioModel].meter)return;rxBuffer=[];awaitingMeter=true;lastCat="TX: 00 00 00 00 E7";updateDiag();clearTimeout(meterTimeout);meterTimeout=setTimeout(()=>{awaitingMeter=false;},400);try{await writer.write(new Uint8Array([0,0,0,0,0xE7]));}catch(e){awaitingMeter=false;}}
 
 // ---- FLRig client (XML-RPC over HTTP, via local CORS-proxy bridge) ----
@@ -790,7 +795,8 @@ function applyFlrigModeAvailability(){
     }
   });
 }
-function feedSerial(data){for(const b of data)rxBuffer.push(b);if(awaitingMeter&&rxBuffer.length){const b=rxBuffer.shift();decodeMeterResponse(b);awaitingMeter=false;clearTimeout(meterTimeout);return;}if(awaitingFreq&&rxBuffer.length>=5){const block=rxBuffer.splice(0,5);if(decodeFrequencyResponse(block)){awaitingFreq=false;clearTimeout(queryTimeout);}else rxBuffer=[];}}
+function feedSerial(data){for(const b of data)rxBuffer.push(b);if(awaitingMeter&&rxBuffer.length){const b=rxBuffer.shift();decodeMeterResponse(b);awaitingMeter=false;clearTimeout(meterTimeout);return;}if(awaitingFreq&&rxBuffer.length>=5){clearTimeout(freqSettleTimer);freqSettleTimer=setTimeout(finishFreqFrame,20);}}
+function finishFreqFrame(){freqSettleTimer=null;if(!awaitingFreq||rxBuffer.length<5)return;const block=rxBuffer.slice(-5);rxBuffer=[];if(decodeFrequencyResponse(block)){awaitingFreq=false;clearTimeout(queryTimeout);}}
 async function readLoop(){keepReading=true;try{while(port?.readable&&keepReading){reader=port.readable.getReader();try{while(true){const {value,done}=await reader.read();if(done)break;feedSerial(value);}}catch(e){}finally{reader.releaseLock();}}}catch(e){setStatus("Serial error: "+e.message);}}
 async function disconnect(){if(pollTimer)clearInterval(pollTimer);if(meterPollTimer)clearInterval(meterPollTimer);pollTimer=meterPollTimer=null;keepReading=false;if(reader){try{await reader.cancel();}catch(e){}}if(writer){try{writer.releaseLock();}catch(e){}}if(port){try{await port.close();}catch(e){}}port=null;writer=null;reader=null;$("connect").textContent="Connect";$("connect").className="connect";state.sMeter=0;state.squelchOpen=false;renderSMeter();setStatus("Disconnected");}
 $("connect").onclick=async()=>{
