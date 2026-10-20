@@ -4,9 +4,9 @@ Browser-based CAT / CI-V control with baseband waterfall and built-in **FT8 / FT
 
 | App | Radio | Version |
 |-----|--------|---------|
-| [857app](./857app/) | Yaesu FT-857D (CAT) | v0.109 |
-| [RadioWaterfall](./RadioWaterfall/) | Generic CAT / FLRig + waterfall | v0.52 |
-| [G90app](./G90app/) | Xiegu G90 (CI-V) | v0.82 |
+| [857app](./857app/) | Yaesu FT-857D (CAT) | v0.110 |
+| [RadioWaterfall](./RadioWaterfall/) | Generic CAT / FLRig + waterfall | v0.53 |
+| [G90app](./G90app/) | Xiegu G90 (CI-V) | v0.83 |
 
 Each folder has a **feature overview** and **operating guide** in its `README.md`.
 
